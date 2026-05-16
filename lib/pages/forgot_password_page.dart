@@ -11,7 +11,7 @@ class ForgotPasswordPage extends StatefulWidget {
 }
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
-  final TextEditingController _studentIdController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final ApiService _apiService = ApiService.instance;
   String _feedback = '';
   bool _loading = false;
@@ -21,7 +21,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       _loading = true;
       _feedback = '';
     });
-    final result = await _apiService.forgotPassword(_studentIdController.text.trim());
+    final result = await _apiService.forgotPassword(_emailController.text.trim());
     setState(() {
       _loading = false;
       _feedback = result;
@@ -54,18 +54,19 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Nhập MSSV để nhận hướng dẫn cấp lại mật khẩu hoặc liên hệ bộ phận hỗ trợ.',
+                  'Nhập email để nhận hướng dẫn cấp lại mật khẩu hoặc liên hệ bộ phận hỗ trợ.',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
                 TextField(
-                  controller: _studentIdController,
+                  controller: _emailController,
                   decoration: InputDecoration(
-                    labelText: 'MSSV',
-                    hintText: 'Nhập mã số sinh viên của bạn',
+                    labelText: 'Email',
+                    hintText: 'Nhập email của bạn',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.badge),
+                    prefixIcon: const Icon(Icons.email_outlined),
                   ),
+                  keyboardType: TextInputType.emailAddress,
                 ),
                 const SizedBox(height: 16),
                 SizedBox(

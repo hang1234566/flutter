@@ -172,11 +172,13 @@ class _FlightsPageState extends State<FlightsPage> {
                             borderRadius: BorderRadius.circular(16),
                             child: Row(
                               children: [
-                                Hero(tag: f.id, child: ClipRRect(
-                                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
-                                  child: Image.network('https://picsum.photos/200/140?random=$i', width: 140, height: 140, fit: BoxFit.cover),
+                                Hero(
+                                  tag: f.id,
+                                  child: ClipRRect(
+                                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
+                                    child: Image.network('https://picsum.photos/200/140?random=$i', width: 140, height: 140, fit: BoxFit.cover),
+                                  ),
                                 ),
-                              ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(

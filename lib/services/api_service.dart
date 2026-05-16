@@ -83,13 +83,13 @@ class ApiService {
   }
 
   // API 9: Forgot password support
-  Future<String> forgotPassword(String studentId) async {
+  Future<String> forgotPassword(String email) async {
     await Future.delayed(const Duration(milliseconds: 400));
-    final exists = _students.any((student) => student.id == studentId);
-    if (exists) {
-      return 'Yêu cầu lấy lại mật khẩu đã được gửi. Vui lòng kiểm tra email hoặc liên hệ 0123 456 789.';
+    final cleanedEmail = email.trim();
+    if (cleanedEmail.isEmpty) {
+      return 'Vui lòng nhập email hợp lệ để tiếp tục.';
     }
-    return 'Không tìm thấy MSSV. Vui lòng kiểm tra lại thông tin.';
+    return 'Yêu cầu lấy lại mật khẩu đã được gửi tới $cleanedEmail. Vui lòng kiểm tra email hoặc liên hệ 0123 456 789.';
   }
 
   // API 10: Export student list as CSV
