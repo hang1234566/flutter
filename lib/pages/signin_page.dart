@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
-import 'home_page.dart';
+import 'flights_page.dart';
 import 'forgot_password_page.dart';
 
 class SignInPage extends StatefulWidget {
@@ -23,7 +23,7 @@ class _SignInPageState extends State<SignInPage> {
     if (!mounted) return;
     setState(() => _loading = false);
     if (success) {
-      Navigator.push(context, MaterialPageRoute(builder: (c) => const HomePage()));
+      Navigator.push(context, MaterialPageRoute(builder: (c) => const FlightsPage()));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -50,50 +50,44 @@ class _SignInPageState extends State<SignInPage> {
           padding: const EdgeInsets.all(20),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
+              constraints: const BoxConstraints(maxWidth: 520),
               child: Card(
-                elevation: 8,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 10,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(28),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.school_rounded, size: 72, color: Color(0xFF00C59E)),
+                      CircleAvatar(radius: 44, backgroundColor: Theme.of(context).primaryColor, child: const Icon(Icons.flight, size: 40, color: Colors.white)),
                       const SizedBox(height: 12),
-                      const Text("ĐĂNG NHẬP UDA", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF00C59E))),
-                      const SizedBox(height: 8),
-                      const Text("Vui lòng nhập thông tin để tiếp tục", style: TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 24),
+                      const Text("Welcome back", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      const Text("Đăng nhập để tiếp tục đặt vé", style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 20),
 
-                      // Ô nhập Mã số sinh viên
                       TextField(
                         controller: _user,
-                        decoration: InputDecoration(
-                          labelText: "Mã số sinh viên",
-                          hintText: "Nhập mã số sinh viên của bạn",
-                          prefixIcon: const Icon(Icons.person_outline),
-                          helperText: 'Ví dụ: 106010',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        decoration: const InputDecoration(
+                          labelText: "Email",
+                          hintText: "you@example.com",
+                          prefixIcon: Icon(Icons.email_outlined),
                         ),
-                        keyboardType: TextInputType.number,
+                        keyboardType: TextInputType.emailAddress,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
 
-                      // Ô nhập Mật khẩu
                       TextField(
                         controller: _pass,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: "Mật khẩu",
                           hintText: "Nhập mật khẩu",
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: Icon(Icons.lock_outline),
                         ),
-                        obscureText: true, // Hiện dấu chấm bảo mật
+                        obscureText: true,
                       ),
 
                       const SizedBox(height: 8),
-                      // Nút Quên mật khẩu (canh phải)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -101,17 +95,16 @@ class _SignInPageState extends State<SignInPage> {
                             onPressed: () {
                               Navigator.push(context, MaterialPageRoute(builder: (c) => const ForgotPasswordPage()));
                             },
-                            child: const Text('Quên mật khẩu?', style: TextStyle(color: Color(0xFF00C59E))),
+                            child: Text('Quên mật khẩu?', style: TextStyle(color: Theme.of(context).primaryColor)),
                           ),
                         ],
                       ),
 
-                      // Remember me + login button
                       Row(
                         children: [
                           Checkbox(
                             value: _remember,
-                            activeColor: const Color(0xFF00C59E),
+                            activeColor: Theme.of(context).primaryColor,
                             onChanged: (v) => setState(() => _remember = v ?? false),
                           ),
                           const Text('Ghi nhớ đăng nhập'),
@@ -122,7 +115,6 @@ class _SignInPageState extends State<SignInPage> {
                       ElevatedButton(
                         onPressed: _loading ? null : _login,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00C59E),
                           minimumSize: const Size(double.infinity, 52),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import '../models/student.dart';
+import '../models/flight.dart';
+import '../models/booking.dart';
 
 class ApiService {
   ApiService._privateConstructor();
@@ -13,10 +15,13 @@ class ApiService {
     Student(id: '105999', fullName: 'Nguyễn Minh Khôi', lop: 'ST23A1', email: 'khoinm@donga.edu.vn'),
   ];
 
-  // API 1: Login endpoint
-  Future<bool> login(String studentId, String password) async {
+  // API 1: Login endpoint (demo - accept any non-empty email/password)
+  Future<bool> login(String email, String password) async {
     await Future.delayed(const Duration(milliseconds: 500));
-    return studentId == '106010' && password == '123456';
+    final e = email.trim();
+    final p = password.trim();
+    if (e.isEmpty || p.isEmpty) return false;
+    return true;
   }
 
   // API 2: Get all students
@@ -95,6 +100,92 @@ class ApiService {
       '${student.id},${student.fullName},${student.lop},${student.email},${student.phone},${student.status}'
     );
     return ([header, ...rows]).join('\n');
+  }
+
+  // --- Flight booking APIs (in-memory sample data) ---
+  final List<Flight> _flights = [
+    Flight(
+      id: 'F001',
+      from: 'Hanoi',
+      to: 'Ho Chi Minh',
+      depart: DateTime.now().add(const Duration(days: 1, hours: 9)),
+      arrive: DateTime.now().add(const Duration(days: 1, hours: 11, minutes: 30)),
+      price: 120.0,
+      seatsAvailable: 18,
+    ),
+    Flight(
+      id: 'F002',
+      from: 'Hanoi',
+      to: 'Da Nang',
+      depart: DateTime.now().add(const Duration(days: 2, hours: 7)),
+      arrive: DateTime.now().add(const Duration(days: 2, hours: 8, minutes: 40)),
+      price: 80.0,
+      seatsAvailable: 25,
+    ),
+    Flight(
+      id: 'F003',
+      from: 'Ho Chi Minh',
+      to: 'Phu Quoc',
+      depart: DateTime.now().add(const Duration(days: 3, hours: 14)),
+      arrive: DateTime.now().add(const Duration(days: 3, hours: 15, minutes: 20)),
+      price: 150.0,
+      seatsAvailable: 12,
+    ),
+  ];
+
+  final List<Booking> _bookings = [];
+
+  Future<List<Flight>> getFlights() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return List<Flight>.from(_flights);
+  }
+
+  Future<List<Flight>> searchFlights(String from, String to, {DateTime? departDate, double? minPrice, double? maxPrice, int? minSeats}) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final f = from.toLowerCase().trim();
+    final t = to.toLowerCase().trim();
+    return _flights.where((flight) {
+      final matchFrom = f.isEmpty || flight.from.toLowerCase().contains(f);
+      final matchTo = t.isEmpty || flight.to.toLowerCase().contains(t);
+      final matchDate = departDate == null || (flight.depart.year == departDate.year && flight.depart.month == departDate.month && flight.depart.day == departDate.day);
+      final matchMinPrice = minPrice == null || flight.price >= minPrice;
+      final matchMaxPrice = maxPrice == null || flight.price <= maxPrice;
+      final matchSeats = minSeats == null || flight.seatsAvailable >= minSeats;
+      return matchFrom && matchTo && matchDate && matchMinPrice && matchMaxPrice && matchSeats;
+    }).toList();
+  }
+
+  Future<Booking> bookFlight(String flightId, String passengerName, int seats) async {
+    await Future.delayed(const Duration(milliseconds: 400));
+    final flight = _flights.firstWhere((f) => f.id == flightId);
+    if (flight.seatsAvailable < seats) throw Exception('Not enough seats');
+    flight.seatsAvailable -= seats;
+    final booking = Booking(
+      id: 'B${DateTime.now().millisecondsSinceEpoch}',
+      flightId: flightId,
+      passengerName: passengerName,
+      bookedAt: DateTime.now(),
+      seats: seats,
+    );
+    _bookings.add(booking);
+    return booking;
+  }
+
+  Future<List<Booking>> getBookings() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return List<Booking>.from(_bookings);
+  }
+
+  Future<bool> cancelBooking(String bookingId) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final index = _bookings.indexWhere((b) => b.id == bookingId);
+    if (index < 0) return false;
+    final booking = _bookings[index];
+    if (booking.status == 'cancelled') return false;
+    final flight = _flights.firstWhere((f) => f.id == booking.flightId, orElse: () => throw Exception('Flight not found'));
+    flight.seatsAvailable += booking.seats;
+    booking.status = 'cancelled';
+    return true;
   }
 
   // Extra API: Class summary
