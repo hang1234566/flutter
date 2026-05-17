@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/student.dart';
 import '../services/api_service.dart';
 import 'detail_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -14,8 +17,9 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Student> students = [];
   List<Student> filtered = [];
+  Map<String, int> _summary = {};
   final TextEditingController _search = TextEditingController();
-  final ApiService _apiService = ApiService.instance;
+  final ApiService _api = ApiService.instance;
   String selectedLop = 'Tất cả';
   bool _loading = true;
 
@@ -25,269 +29,291 @@ class _HomePageState extends State<HomePage> {
     _loadStudents();
   }
 
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadStudents() async {
     setState(() => _loading = true);
-    students = await _apiService.getStudents();
-    filtered = await _apiService.searchStudents(_search.text, lop: selectedLop);
+    students = await _api.getStudents();
+    _summary = await _api.getClassSummary();
+    await _applyFilter();
     if (!mounted) return;
     setState(() => _loading = false);
   }
 
-  Future<void> _filter(String query) async {
-    filtered = await _apiService.searchStudents(query, lop: selectedLop);
-    if (!mounted) return;
-    setState(() {});
+  Future<void> _applyFilter() async {
+    final q = _search.text.trim();
+    if (q.isNotEmpty) {
+      filtered = await _api.searchStudents(q, lop: selectedLop);
+    } else if (selectedLop != 'Tất cả') {
+      filtered = await _api.filterStudentsByClass(selectedLop);
+    } else {
+      filtered = List<Student>.from(students);
+    }
+    if (mounted) setState(() {});
   }
 
-  Future<void> _refresh() async {
+  Future<void> _openClassFilter() async {
+    final lops = ['Tất cả', 'ST23A1', 'ST23B2'];
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('Lọc theo lớp (API 5)', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            ...lops.map(
+              (lop) => ListTile(
+                title: Text(lop),
+                trailing: selectedLop == lop ? const Icon(Icons.check, color: Color(0xFF8E24AA)) : null,
+                onTap: () => Navigator.pop(ctx, lop),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) {
+      setState(() => selectedLop = picked);
+      await _applyFilter();
+    }
+  }
+
+  Future<void> _addStudent() async {
+    final idCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final lopCtrl = TextEditingController(text: 'ST23A1');
+    final emailCtrl = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Thêm sinh viên (API 6)'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: idCtrl, decoration: const InputDecoration(labelText: 'MSSV')),
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Họ tên')),
+              TextField(controller: lopCtrl, decoration: const InputDecoration(labelText: 'Lớp')),
+              TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Thêm')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final newStudent = Student(
+      id: idCtrl.text.trim(),
+      fullName: nameCtrl.text.trim(),
+      lop: lopCtrl.text.trim(),
+      email: emailCtrl.text.trim(),
+    );
+    if (newStudent.id.isEmpty || newStudent.fullName.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập MSSV và họ tên')),
+      );
+      return;
+    }
+
+    await _api.addStudent(newStudent);
     await _loadStudents();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Thêm sinh viên thành công')),
+    );
+  }
+
+  Future<void> _exportList() async {
+    final csv = await _api.exportStudentList();
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xuất danh sách (API 10)'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(child: Text(csv, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'))),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: csv));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Đã sao chép CSV')),
+              );
+            },
+            child: const Text('Sao chép'),
+          ),
+          FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openDetail(Student s) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (c) => DetailPage(studentId: s.id, initial: s),
+      ),
+    );
+    if (changed == true) await _loadStudents();
   }
 
   @override
   Widget build(BuildContext context) {
     final lops = <String>{'Tất cả', ...students.map((s) => s.lop)}.toList();
-
-    final totalStudents = students.length;
-    final classA = students.where((s) => s.lop == 'ST23A1').length;
-    final classB = students.where((s) => s.lop == 'ST23B2').length;
+    final total = _summary['total'] ?? students.length;
+    final classA = _summary['ST23A1'] ?? 0;
+    final classB = _summary['ST23B2'] ?? 0;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F5FC),
       appBar: AppBar(
-        title: const Text("DANH SÁCH LỚP ST23", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: const Text('Quản lý ST23', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF8E24AA),
-        centerTitle: true,
-        elevation: 6,
+        foregroundColor: Colors.white,
+        automaticallyImplyLeading: !widget.embedded,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         child: Column(
           children: [
             Container(
               width: double.infinity,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(colors: [Color(0xFFB39DDB), Color(0xFFD7B7F9)]),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  const BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.08), blurRadius: 12, offset: Offset(0, 6)),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  _summaryTile('Tổng', '$total', Icons.group),
+                  _summaryTile('ST23A1', '$classA', Icons.class_),
+                  _summaryTile('ST23B2', '$classB', Icons.class_),
                 ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Tổng quan lớp', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    const Text('ST23A / ST23B', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        _buildSummaryTile('Sinh viên', totalStudents.toString(), Icons.group, Colors.white),
-                        const SizedBox(width: 12),
-                        _buildSummaryTile('ST23A1', classA.toString(), Icons.class_, Colors.white),
-                        const SizedBox(width: 12),
-                        _buildSummaryTile('ST23B2', classB.toString(), Icons.class_, Colors.white),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: const [
-                        Chip(label: Text('Hoạt động mới')), 
-                        Chip(label: Text('Khóa học chuyên ngành')),
-                        Chip(label: Text('Cập nhật điểm')), 
-                      ],
-                    ),
-                  ],
-                ),
-              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _search,
-                    onChanged: _filter,
+                    onChanged: (_) => _applyFilter(),
                     decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search),
-                      hintText: 'Tìm theo tên, MSSV hoặc email',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                      isDense: true,
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      hintText: 'Tìm kiếm (API 4)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Tooltip(
-                  message: 'Bộ lọc nhanh',
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8E24AA),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                    ),
-                    child: const Icon(Icons.filter_list),
-                  ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  tooltip: 'Lọc lớp (API 5)',
+                  style: IconButton.styleFrom(backgroundColor: const Color(0xFF8E24AA)),
+                  onPressed: _openClassFilter,
+                  icon: const Icon(Icons.filter_list, size: 20),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             SizedBox(
-              height: 42,
+              height: 36,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
+                itemCount: lops.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 6),
                 itemBuilder: (context, i) {
                   final lop = lops[i];
                   final selected = lop == selectedLop;
-                  return ChoiceChip(
-                    label: Text(lop),
+                  return FilterChip(
+                    label: Text(lop, style: const TextStyle(fontSize: 12)),
                     selected: selected,
-                    onSelected: (_) {
+                    onSelected: (_) async {
                       setState(() => selectedLop = lop);
-                      _filter(_search.text);
+                      await _applyFilter();
                     },
-                    selectedColor: const Color(0xFF00C59E),
-                    backgroundColor: Colors.grey.shade200,
-                    labelStyle: TextStyle(color: selected ? Colors.white : Colors.black87),
+                    selectedColor: const Color(0xFF8E24AA).withValues(alpha: 0.25),
                   );
                 },
-                separatorBuilder: (context, index) => const SizedBox(width: 8),
-                itemCount: lops.length,
               ),
             ),
-            const SizedBox(height: 14),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                children: [
-                  ActionChip(
-                    label: const Text('Thêm sinh viên'),
-                    avatar: const Icon(Icons.person_add, size: 18, color: Colors.white),
-                    onPressed: () async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      final newStudent = Student(
-                        id: '107000',
-                        fullName: 'Nguyễn Thanh Tâm',
-                        lop: 'ST23A1',
-                        email: 'tamtv@donga.edu.vn',
-                      );
-                      await _apiService.addStudent(newStudent);
-                      await _loadStudents();
-                      if (!mounted) return;
-                      messenger.showSnackBar(const SnackBar(content: Text('Thêm sinh viên thành công')));
-                    },
-                    backgroundColor: const Color(0xFF6A1B9A),
-                    labelStyle: const TextStyle(color: Colors.white),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  ActionChip(
-                    label: const Text('Xuất DS'),
-                    avatar: const Icon(Icons.download, size: 18, color: Color(0xFF6A1B9A)),
-                    onPressed: () async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      final csv = await _apiService.exportStudentList();
-                      if (!mounted) return;
-                      messenger.showSnackBar(SnackBar(content: Text('Xuất DS thành công (${csv.split('\n').length - 1} bản ghi)')));
-                    },
-                    backgroundColor: Colors.white,
-                    labelStyle: const TextStyle(color: Color(0xFF6A1B9A)),
-                    side: const BorderSide(color: Color(0xFF6A1B9A)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                ActionChip(
+                  label: const Text('Thêm', style: TextStyle(fontSize: 12)),
+                  avatar: const Icon(Icons.person_add, size: 16),
+                  onPressed: _addStudent,
+                ),
+                const SizedBox(width: 8),
+                ActionChip(
+                  label: const Text('Xuất CSV', style: TextStyle(fontSize: 12)),
+                  avatar: const Icon(Icons.download, size: 16),
+                  onPressed: _exportList,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: _refresh,
+                onRefresh: _loadStudents,
                 child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : filtered.isEmpty
-                    ? ListView(children: [const SizedBox(height: 40), const Center(child: Text('Không tìm thấy sinh viên'))])
-                    : ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        final s = filtered[index];
-                        return Card(
-                          elevation: 4,
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 28,
-                                      backgroundColor: const Color(0xFF00C59E),
-                                      child: Text(s.fullName.split(' ').map((p) => p.isNotEmpty ? p[0] : '').take(2).join(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ? const Center(child: CircularProgressIndicator())
+                    : filtered.isEmpty
+                        ? ListView(
+                            children: const [
+                              SizedBox(height: 40),
+                              Center(child: Text('Không có sinh viên')),
+                            ],
+                          )
+                        : ListView.separated(
+                            itemCount: filtered.length,
+                            separatorBuilder: (context, index) => const SizedBox(height: 6),
+                            itemBuilder: (context, index) {
+                              final s = filtered[index];
+                              return Material(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                child: ListTile(
+                                  dense: true,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                                  leading: CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: const Color(0xFF00C59E),
+                                    child: Text(
+                                      s.fullName.isNotEmpty ? s.fullName[0] : '?',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                                     ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(s.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                          const SizedBox(height: 4),
-                                          Text('MSSV: ${s.id}', style: const TextStyle(color: Colors.black87)),
-                                          const SizedBox(height: 4),
-                                          Text(s.email, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(color: Colors.deepPurple.shade50, borderRadius: BorderRadius.circular(12)),
-                                      child: Text(s.lop, style: const TextStyle(color: Color(0xFF6A1B9A), fontWeight: FontWeight.w600)),
-                                    ),
-                                  ],
+                                  ),
+                                  title: Text(s.fullName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                  subtitle: Text('${s.id} · ${s.lop}', style: const TextStyle(fontSize: 11)),
+                                  trailing: const Icon(Icons.chevron_right, size: 20),
+                                  onTap: () => _openDetail(s),
                                 ),
-                                const SizedBox(height: 10),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    Chip(label: const Text('Điểm cao')), 
-                                    Chip(label: const Text('Hoạt động')), 
-                                    Chip(label: const Text('Khóa chính')),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () {
-                                          Navigator.push(context, MaterialPageRoute(builder: (c) => DetailPage(student: s)));
-                                        },
-                                        icon: const Icon(Icons.info_outline),
-                                        label: const Text('Chi tiết'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    IconButton(
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gửi email tới ${s.email}')));
-                                      },
-                                      icon: const Icon(Icons.email, color: Color(0xFF8E24AA)),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
-                        );
-                      },
-                    ),
               ),
             ),
           ],
@@ -295,30 +321,22 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-}
 
-Widget _buildSummaryTile(String label, String value, IconData icon, Color iconColor) {
-  return Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-      decoration: BoxDecoration(
-        color: const Color.fromRGBO(255, 255, 255, 0.18),
-        borderRadius: BorderRadius.circular(16),
-      ),
+  Widget _summaryTile(String label, String value, IconData icon) {
+    return Expanded(
       child: Row(
         children: [
-          CircleAvatar(radius: 18, backgroundColor: Color.fromRGBO(255, 255, 255, 0.1), child: Icon(icon, color: iconColor, size: 20)),
-          const SizedBox(width: 10),
+          Icon(icon, color: Colors.white70, size: 18),
+          const SizedBox(width: 6),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 4),
-              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
             ],
           ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }

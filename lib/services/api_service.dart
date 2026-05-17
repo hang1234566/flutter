@@ -103,34 +103,67 @@ class ApiService {
   }
 
   // --- Flight booking APIs (in-memory sample data) ---
+  static Flight _mk(
+    String id,
+    String from,
+    String to,
+    int dayOffset,
+    int hour,
+    int minute,
+    int durationMin,
+    double price,
+    int seats,
+  ) {
+    final base = DateTime.now();
+    final depart = DateTime(base.year, base.month, base.day + dayOffset, hour, minute);
+    return Flight(
+      id: id,
+      from: from,
+      to: to,
+      depart: depart,
+      arrive: depart.add(Duration(minutes: durationMin)),
+      price: price,
+      seatsAvailable: seats,
+    );
+  }
+
   final List<Flight> _flights = [
-    Flight(
-      id: 'F001',
-      from: 'Hanoi',
-      to: 'Ho Chi Minh',
-      depart: DateTime.now().add(const Duration(days: 1, hours: 9)),
-      arrive: DateTime.now().add(const Duration(days: 1, hours: 11, minutes: 30)),
-      price: 120.0,
-      seatsAvailable: 18,
-    ),
-    Flight(
-      id: 'F002',
-      from: 'Hanoi',
-      to: 'Da Nang',
-      depart: DateTime.now().add(const Duration(days: 2, hours: 7)),
-      arrive: DateTime.now().add(const Duration(days: 2, hours: 8, minutes: 40)),
-      price: 80.0,
-      seatsAvailable: 25,
-    ),
-    Flight(
-      id: 'F003',
-      from: 'Ho Chi Minh',
-      to: 'Phu Quoc',
-      depart: DateTime.now().add(const Duration(days: 3, hours: 14)),
-      arrive: DateTime.now().add(const Duration(days: 3, hours: 15, minutes: 20)),
-      price: 150.0,
-      seatsAvailable: 12,
-    ),
+    _mk('F001', 'Hanoi', 'Ho Chi Minh', 1, 6, 0, 150, 89, 22),
+    _mk('F002', 'Hanoi', 'Ho Chi Minh', 1, 14, 30, 150, 95, 18),
+    _mk('F003', 'Hanoi', 'Ho Chi Minh', 2, 8, 15, 150, 110, 30),
+    _mk('F004', 'Hanoi', 'Da Nang', 1, 7, 0, 80, 65, 28),
+    _mk('F005', 'Hanoi', 'Da Nang', 2, 16, 45, 80, 72, 20),
+    _mk('F006', 'Hanoi', 'Phu Quoc', 3, 9, 30, 130, 135, 14),
+    _mk('F007', 'Hanoi', 'Nha Trang', 2, 11, 0, 105, 98, 16),
+    _mk('F008', 'Hanoi', 'Hue', 1, 10, 20, 55, 58, 32),
+    _mk('F009', 'Hanoi', 'Can Tho', 2, 13, 0, 95, 88, 19),
+    _mk('F010', 'Hanoi', 'Hai Phong', 1, 18, 0, 40, 42, 40),
+    _mk('F011', 'Ho Chi Minh', 'Hanoi', 1, 7, 30, 150, 92, 24),
+    _mk('F012', 'Ho Chi Minh', 'Hanoi', 3, 19, 0, 150, 105, 15),
+    _mk('F013', 'Ho Chi Minh', 'Da Nang', 1, 9, 0, 70, 68, 26),
+    _mk('F014', 'Ho Chi Minh', 'Phu Quoc', 2, 14, 0, 55, 145, 12),
+    _mk('F015', 'Ho Chi Minh', 'Phu Quoc', 4, 6, 45, 55, 128, 20),
+    _mk('F016', 'Ho Chi Minh', 'Nha Trang', 1, 12, 30, 50, 75, 22),
+    _mk('F017', 'Ho Chi Minh', 'Can Tho', 1, 17, 15, 45, 48, 35),
+    _mk('F018', 'Ho Chi Minh', 'Quy Nhon', 2, 8, 0, 60, 82, 18),
+    _mk('F019', 'Da Nang', 'Hanoi', 1, 11, 0, 80, 70, 21),
+    _mk('F020', 'Da Nang', 'Ho Chi Minh', 2, 15, 30, 70, 66, 27),
+    _mk('F021', 'Da Nang', 'Hue', 1, 9, 15, 35, 45, 38),
+    _mk('F022', 'Da Nang', 'Nha Trang', 2, 10, 0, 50, 62, 24),
+    _mk('F023', 'Da Nang', 'Da Lat', 3, 13, 45, 45, 55, 16),
+    _mk('F024', 'Da Nang', 'Quy Nhon', 1, 16, 0, 40, 52, 20),
+    _mk('F025', 'Phu Quoc', 'Ho Chi Minh', 2, 10, 0, 55, 138, 14),
+    _mk('F026', 'Phu Quoc', 'Hanoi', 4, 11, 30, 130, 155, 10),
+    _mk('F027', 'Nha Trang', 'Hanoi', 2, 14, 0, 105, 102, 17),
+    _mk('F028', 'Nha Trang', 'Ho Chi Minh', 1, 8, 30, 50, 72, 25),
+    _mk('F029', 'Hue', 'Hanoi', 1, 12, 0, 55, 56, 30),
+    _mk('F030', 'Hue', 'Ho Chi Minh', 3, 7, 45, 95, 108, 13),
+    _mk('F031', 'Can Tho', 'Ho Chi Minh', 1, 6, 30, 45, 46, 28),
+    _mk('F032', 'Hai Phong', 'Hanoi', 1, 9, 0, 40, 38, 42),
+    _mk('F033', 'Da Lat', 'Ho Chi Minh', 2, 11, 15, 50, 78, 19),
+    _mk('F034', 'Da Lat', 'Da Nang', 3, 15, 0, 45, 60, 15),
+    _mk('F035', 'Quy Nhon', 'Hanoi', 2, 13, 30, 60, 85, 21),
+    _mk('F036', 'Quy Nhon', 'Ho Chi Minh', 1, 18, 0, 60, 79, 23),
   ];
 
   final List<Booking> _bookings = [];

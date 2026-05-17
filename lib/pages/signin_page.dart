@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
-import 'flights_page.dart';
+import 'flights_shell.dart';
 import 'forgot_password_page.dart';
 
 class SignInPage extends StatefulWidget {
@@ -11,19 +11,22 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
-  final _user = TextEditingController();
-  final _pass = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   final ApiService _apiService = ApiService.instance;
   bool _remember = false;
   bool _loading = false;
+  bool _obscurePassword = true;
 
   Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-    final success = await _apiService.login(_user.text.trim(), _pass.text.trim());
+    final success = await _apiService.login(_emailController.text.trim(), _passwordController.text.trim());
     if (!mounted) return;
     setState(() => _loading = false);
     if (success) {
-      Navigator.push(context, MaterialPageRoute(builder: (c) => const FlightsPage()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const FlightsShell()));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -66,25 +69,40 @@ class _SignInPageState extends State<SignInPage> {
                       const Text("Đăng nhập để tiếp tục đặt vé", style: TextStyle(color: Colors.grey)),
                       const SizedBox(height: 20),
 
-                      TextField(
-                        controller: _user,
-                        decoration: const InputDecoration(
-                          labelText: "Email",
-                          hintText: "you@example.com",
-                          prefixIcon: Icon(Icons.email_outlined),
+                      Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextFormField(
+                              controller: _emailController,
+                              decoration: const InputDecoration(
+                                labelText: "Email",
+                                hintText: "you@example.com",
+                                prefixIcon: Icon(Icons.email_outlined),
+                              ),
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (v) =>
+                                  v == null || v.trim().isEmpty ? 'Vui lòng nhập email' : null,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _passwordController,
+                              decoration: InputDecoration(
+                                labelText: "Mật khẩu",
+                                hintText: "Nhập mật khẩu",
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                ),
+                              ),
+                              obscureText: _obscurePassword,
+                              validator: (v) =>
+                                  v == null || v.isEmpty ? 'Vui lòng nhập mật khẩu' : null,
+                            ),
+                          ],
                         ),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 14),
-
-                      TextField(
-                        controller: _pass,
-                        decoration: const InputDecoration(
-                          labelText: "Mật khẩu",
-                          hintText: "Nhập mật khẩu",
-                          prefixIcon: Icon(Icons.lock_outline),
-                        ),
-                        obscureText: true,
                       ),
 
                       const SizedBox(height: 8),
